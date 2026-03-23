@@ -1,83 +1,27 @@
-# 🎓 API Académica — Backend FastAPI
+# 🎓 API Académica
 
-Backend modular para una plataforma académica con tres funcionalidades principales:
-generación de diagramas UML, documentos (PDF/Word/PPT) y grafos de citaciones.
+API REST construida con **FastAPI** que provee tres herramientas para plataformas académicas.
 
----
-
-## 📁 Estructura del Proyecto
-
-```
-backend/
-├── app/
-│   ├── main.py                 ← Punto de entrada, configuración global
-│   ├── routers/
-│   │   ├── uml.py              ← Endpoints /uml/...
-│   │   ├── documents.py        ← Endpoints /documents/...
-│   │   └── citations.py        ← Endpoints /citations/...
-│   ├── services/
-│   │   ├── uml_service.py      ← Lógica de generación UML
-│   │   ├── document_service.py ← Lógica de documentos
-│   │   └── citation_service.py ← Lógica de citaciones + OpenAlex
-│   ├── models/
-│   │   ├── uml_models.py       ← Modelos Pydantic para UML
-│   │   ├── document_models.py  ← Modelos Pydantic para documentos
-│   │   └── citation_models.py  ← Modelos Pydantic para citaciones
-│   └── utils/
-│       ├── plantuml.py         ← Conversión JSON→PlantUML + encoding
-│       └── graph_generator.py  ← Generación de grafos con networkx
-├── media/
-│   ├── uml/                    ← Imágenes de diagramas generadas
-│   ├── documents/              ← Documentos generados
-│   └── graphs/                 ← Imágenes de grafos generadas
-├── requirements.txt
-└── README.md
-```
+**URL base (producción):** `https://academic-api-888p.onrender.com`  
+**Documentación interactiva:** `https://academic-api-888p.onrender.com/docs`
 
 ---
 
-## ⚙️ Instalación y Ejecución
+## ¿Qué hace esta API?
 
-### 1. Clonar y crear entorno virtual
-
-```bash
-# Crear entorno virtual (recomendado)
-python -m venv venv
-
-# Activar en Windows
-venv\Scripts\activate
-
-# Activar en Mac/Linux
-source venv/bin/activate
-```
-
-### 2. Instalar dependencias
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Ejecutar el servidor
-
-```bash
-# Desde la carpeta /backend
-uvicorn app.main:app --reload
-```
-
-El servidor estará disponible en: **http://localhost:8000**
-
-### 4. Ver la documentación interactiva
-
-- **Swagger UI**: http://localhost:8000/docs  ← Puedes probar los endpoints aquí
-- **ReDoc**:      http://localhost:8000/redoc
+| Endpoint | Descripción |
+|---|---|
+| `POST /uml/generate` | Genera una imagen PNG de un diagrama UML desde JSON |
+| `POST /documents/generate` | Convierte texto a PDF, Word o PowerPoint (descarga directa) |
+| `POST /citations/graph` | Genera un grafo visual de citaciones a partir de un DOI |
 
 ---
 
-## 🔌 Endpoints
+## Endpoints
 
-### 📊 UML — `POST /uml/generate`
+### 📊 `POST /uml/generate`
 
-Genera una imagen PNG de un diagrama UML a partir de un JSON.
+Recibe clases y relaciones, devuelve la URL de la imagen generada.
 
 **Request:**
 ```json
@@ -87,11 +31,11 @@ Genera una imagen PNG de un diagrama UML a partir de un JSON.
     {
       "name": "Usuario",
       "attributes": [
-        {"name": "id",     "type": "int",    "visibility": "public"},
-        {"name": "nombre", "type": "string", "visibility": "public"}
+        { "name": "id",     "type": "int",    "visibility": "public" },
+        { "name": "nombre", "type": "string", "visibility": "private" }
       ],
       "methods": [
-        {"name": "login()", "returnType": "void", "visibility": "public"}
+        { "name": "login()", "returnType": "void", "visibility": "public" }
       ]
     }
   ],
@@ -107,108 +51,157 @@ Genera una imagen PNG de un diagrama UML a partir de un JSON.
 }
 ```
 
-**Response:**
+**Response `200`:**
 ```json
 {
-  "image_url": "http://localhost:8000/media/uml/diagram_abc12345.png",
-  "plantuml_code": "@startuml\n..."
+  "image_url": "https://academic-api-888p.onrender.com/media/uml/diagram_abc123.png",
+  "plantuml_code": "@startuml\nclass Usuario {\n  +id : int\n}\n@enduml"
 }
 ```
 
-**Tipos de visibilidad:** `public` (+), `private` (-), `protected` (#)
+**Valores válidos:**
 
-**Tipos de relación:** `association`, `inheritance`, `composition`, `aggregation`, `dependency`, `realization`
+- `visibility`: `"public"` → `+` / `"private"` → `-` / `"protected"` → `#`
+- `type` (relación): `"association"` · `"inheritance"` · `"composition"` · `"aggregation"` · `"dependency"` · `"realization"`
 
 ---
 
-### 📄 Documentos — `POST /documents/generate`
+### 📄 `POST /documents/generate`
 
-Genera y descarga un documento desde texto plano.
+Genera un documento y lo devuelve como **archivo descargable**.
 
 **Request:**
 ```json
 {
-  "text": "Introducción\n\nEste es el contenido principal del documento.\n\nConclusión\n\nResumen final.",
+  "title": "Informe de Sistemas",
   "format": "pdf",
-  "title": "Mi Documento Académico"
+  "text": "Introducción\n\nContenido del primer párrafo.\n\nConclusión\n\nResumen final."
 }
 ```
 
-- `format` puede ser: `"pdf"`, `"word"`, `"ppt"`
-- Usa **doble salto de línea** (`\n\n`) para separar secciones/slides
-- La respuesta es el archivo para descargar directamente
+**Valores de `format`:** `"pdf"` · `"word"` · `"ppt"`
+
+> Usa doble salto de línea `\n\n` para separar secciones. En PPT cada sección se convierte en un slide.
+
+**Response:** El archivo se descarga directamente (no es JSON).
 
 ---
 
-### 🔗 Citaciones — `POST /citations/graph`
+### 🔗 `POST /citations/graph`
 
-Genera un grafo visual de papers que citan al artículo dado por DOI.
+Busca un paper por DOI en OpenAlex y genera un grafo PNG con los papers que lo citan.
 
 **Request:**
 ```json
 {
-  "doi": "10.1038/nature12373",
+  "doi": "10.1038/s41586-021-03819-2",
   "max_nodes": 20
 }
 ```
 
-**Response:**
+**Response `200`:**
 ```json
 {
-  "image_url": "http://localhost:8000/media/graphs/graph_xyz98765.png",
-  "total_citations": 15,
-  "paper_title": "Título del paper consultado"
+  "image_url": "https://academic-api-888p.onrender.com/media/graphs/graph_xyz789.png",
+  "total_citations": 18,
+  "paper_title": "Highly accurate protein structure prediction with AlphaFold"
 }
 ```
 
+**Response `404`:** DOI no encontrado en OpenAlex.
+
 ---
 
-## 🗂️ Cómo se Sirven los Archivos (media/)
+## Cómo usar desde tu código
 
-En `main.py` está esta línea clave:
+### JavaScript / Fetch
+
+```javascript
+// Generar diagrama UML
+const response = await fetch('https://academic-api-888p.onrender.com/uml/generate', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    diagramType: 'classDiagram',
+    classes: [{ name: 'Producto', attributes: [], methods: [] }],
+    relationships: []
+  })
+});
+const data = await response.json();
+console.log(data.image_url); // URL de la imagen generada
+```
+
+```javascript
+// Descargar documento PDF
+const response = await fetch('https://academic-api-888p.onrender.com/documents/generate', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    title: 'Mi Reporte',
+    format: 'pdf',
+    text: 'Introducción\n\nContenido principal.'
+  })
+});
+const blob = await response.blob();
+const url = URL.createObjectURL(blob);
+// Mostrar el PDF o forzar descarga
+```
+
+```javascript
+// Grafo de citaciones
+const response = await fetch('https://academic-api-888p.onrender.com/citations/graph', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    doi: '10.1038/nature12373',
+    max_nodes: 15
+  })
+});
+const data = await response.json();
+console.log(data.image_url); // URL del grafo generado
+```
+
+### Python / requests
 
 ```python
-app.mount("/media", StaticFiles(directory="media"), name="media")
-```
-
-Esto hace que FastAPI sirva automáticamente cualquier archivo en la carpeta `media/`
-como si fuera un servidor de archivos estático. Por ejemplo:
-
-- Archivo en disco: `media/uml/diagram_abc.png`
-- URL pública:      `http://localhost:8000/media/uml/diagram_abc.png`
-
----
-
-## 🏗️ Arquitectura: ¿Por qué está organizado así?
-
-| Capa | Responsabilidad |
-|------|----------------|
-| **routers/** | Recibir HTTP, validar con Pydantic, delegar al service |
-| **services/** | Lógica de negocio (orquestar el proceso) |
-| **models/** | Definir la estructura de los JSON de entrada/salida |
-| **utils/** | Funciones reutilizables sin lógica de negocio |
-
-**Ventaja:** Si mañana cambias de PlantUML a otro generador, solo tocas `utils/plantuml.py`.
-Si cambias el formato de la respuesta, solo tocas `models/uml_models.py`.
-
----
-
-## 🧪 Probar con curl
-
-```bash
-# UML
-curl -X POST http://localhost:8000/uml/generate \
-  -H "Content-Type: application/json" \
-  -d '{"diagramType":"classDiagram","classes":[{"name":"User","attributes":[{"name":"id","type":"int","visibility":"public"}],"methods":[]}],"relationships":[]}'
-
-# Documento PDF
-curl -X POST http://localhost:8000/documents/generate \
-  -H "Content-Type: application/json" \
-  -d '{"text":"Hola mundo\n\nSegundo párrafo","format":"pdf","title":"Mi Doc"}' \
-  --output documento.pdf
+import requests
 
 # Grafo de citaciones
-curl -X POST http://localhost:8000/citations/graph \
-  -H "Content-Type: application/json" \
-  -d '{"doi":"10.1038/nature12373","max_nodes":15}'
+r = requests.post(
+    'https://academic-api-888p.onrender.com/citations/graph',
+    json={'doi': '10.1038/nature12373', 'max_nodes': 15}
+)
+print(r.json()['image_url'])
 ```
+
+---
+
+## Correr localmente
+
+```bash
+# 1. Clonar el repositorio
+git clone https://github.com/hugoquizhpi-boop/academic-api.git
+cd academic-api
+
+# 2. Crear entorno virtual
+python -m venv venv
+venv\Scripts\activate        # Windows
+source venv/bin/activate     # Mac / Linux
+
+# 3. Instalar dependencias
+pip install -r requirements.txt
+
+# 4. Iniciar servidor
+uvicorn app.main:app --reload
+```
+
+Servidor disponible en `http://localhost:8000`  
+Documentación interactiva en `http://localhost:8000/docs`
+
+---
+
+## Notas
+
+- Las imágenes y documentos generados se sirven desde `/media/` y son accesibles por URL directa.
+- El servidor en Render puede tardar ~30 segundos en responder la primera petición si estuvo inactivo (plan gratuito).
+- La API de citaciones usa [OpenAlex](https://openalex.org/) — no requiere API key.
