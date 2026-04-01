@@ -1,12 +1,10 @@
 """
 Utilidad para generar grafos de citaciones.
-
-Usa networkx para la estructura del grafo y matplotlib para renderizarlo.
 """
 
 import networkx as nx
 import matplotlib
-matplotlib.use("Agg")  # Backend sin pantalla (necesario en servidor)
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from typing import List, Dict
@@ -18,26 +16,11 @@ def build_citation_graph(
     output_path: str,
     max_nodes: int = 20
 ) -> int:
-    """
-    Construye y guarda una imagen del grafo de citaciones.
-
-    Args:
-        root_title: Título del paper raíz (el que buscamos por DOI)
-        citations: Lista de dicts con {"title": str, "doi": str}
-        output_path: Ruta donde guardar la imagen PNG
-        max_nodes: Máximo de nodos a mostrar
-
-    Returns:
-        Número de citas mostradas en el grafo
-    """
-    # Limitar cantidad de nodos
     citations = citations[:max_nodes]
 
-    # ── Crear el grafo dirigido ───────────────────────────────────────────────
     G = nx.DiGraph()
 
-    # Acortar títulos largos para que quepan en el nodo
-    def short_title(title: str, max_len: int = 40) -> str:
+    def short_title(title: str, max_len: int = 45) -> str:
         return title[:max_len] + "..." if len(title) > max_len else title
 
     root_label = short_title(root_title)
@@ -48,26 +31,23 @@ def build_citation_graph(
         G.add_node(label, node_type="citation")
         G.add_edge(root_label, label)
 
-    # ── Layout del grafo ──────────────────────────────────────────────────────
-    # spring_layout da buena distribución para grafos de citaciones
+    # Layout con más separación entre nodos
     if len(G.nodes) > 1:
-        pos = nx.spring_layout(G, k=2.5, seed=42)
+        pos = nx.spring_layout(G, k=4.0, seed=42)
     else:
         pos = {root_label: (0, 0)}
 
-    # ── Colores por tipo de nodo ──────────────────────────────────────────────
     node_colors = []
     node_sizes  = []
     for node in G.nodes:
         if G.nodes[node].get("node_type") == "root":
-            node_colors.append("#2563EB")  # Azul para el nodo raíz
-            node_sizes.append(3000)
+            node_colors.append("#2563EB")
+            node_sizes.append(800)       # Más pequeño para que el texto quepa
         else:
-            node_colors.append("#10B981")  # Verde para citas
-            node_sizes.append(1500)
+            node_colors.append("#10B981")
+            node_sizes.append(600)
 
-    # ── Dibujar ───────────────────────────────────────────────────────────────
-    fig, ax = plt.subplots(figsize=(14, 10))
+    fig, ax = plt.subplots(figsize=(18, 13))  # Canvas más grande
     fig.patch.set_facecolor("#F8FAFC")
     ax.set_facecolor("#F8FAFC")
 
@@ -83,21 +63,28 @@ def build_citation_graph(
         G, pos,
         edge_color="#94A3B8",
         arrows=True,
-        arrowsize=20,
+        arrowsize=15,
         width=1.5,
         alpha=0.7,
         ax=ax
     )
 
+    # Etiquetas FUERA de los nodos (sobre ellos)
+    label_pos = {node: (x, y + 0.08) for node, (x, y) in pos.items()}
     nx.draw_networkx_labels(
-        G, pos,
+        G, label_pos,
         font_size=7,
-        font_color="white",
+        font_color="#1E293B",   # Texto oscuro para leer sobre fondo claro
         font_weight="bold",
-        ax=ax
+        ax=ax,
+        bbox=dict(
+            boxstyle="round,pad=0.3",
+            facecolor="white",
+            edgecolor="#CBD5E1",
+            alpha=0.85
+        )
     )
 
-    # ── Leyenda ───────────────────────────────────────────────────────────────
     legend_patches = [
         mpatches.Patch(color="#2563EB", label="Paper consultado"),
         mpatches.Patch(color="#10B981", label="Paper citado"),
@@ -105,7 +92,7 @@ def build_citation_graph(
     ax.legend(handles=legend_patches, loc="upper left", fontsize=10)
 
     ax.set_title(
-        f"Grafo de Citaciones\n{short_title(root_title, 70)}",
+        f"Grafo de Citaciones\n{short_title(root_title, 80)}",
         fontsize=12,
         fontweight="bold",
         pad=20
