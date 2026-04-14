@@ -31,6 +31,7 @@ async def generate_uml_diagram(request: UMLRequest, base_url: str) -> UMLRespons
     """
     # Paso 1: Convertir JSON → código PlantUML
     plantuml_code = json_to_plantuml(request)
+    print(f">>> PLANTUML CODE: {plantuml_code}")
 
     # Paso 2: Crear nombre único para el archivo
     filename = f"diagram_{uuid.uuid4().hex[:8]}.png"
