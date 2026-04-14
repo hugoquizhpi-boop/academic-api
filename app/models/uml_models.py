@@ -26,6 +26,7 @@ class Relationship(BaseModel):
     type: str          # "association", "inheritance", "composition", "aggregation"
     from_: str         # Clase origen (usamos from_ porque "from" es palabra reservada)
     to: str            # Clase destino
+    label: Optional[str] = None             # Etiqueta de la relación
     multiplicityFrom: Optional[str] = None  # Ej: "1"
     multiplicityTo: Optional[str] = None    # Ej: "*"
 

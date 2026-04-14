@@ -66,44 +66,23 @@ def relationship_to_plantuml(rel_type: str) -> str:
     return mapping.get(rel_type.lower(), "--")
 
 
-def json_to_plantuml(uml_request) -> str:
-    """
-    Convierte un UMLRequest a código PlantUML.
-
-    Ejemplo de salida:
-        @startuml
-        class Usuario {
-          +id : int
-          +nombre : string
-          +login() : void
-        }
-        Usuario "1" -- "*" Pedido
-        @enduml
-    """
+def json_to_plantuml_class(uml_request) -> str:
+    """Genera código PlantUML para diagrama de clases."""
     lines = ["@startuml", ""]
 
-    # ── Generar cada clase ────────────────────────────────────────────────────
     for cls in uml_request.classes:
         lines.append(f"class {cls.name} {{")
-
-        # Atributos
         for attr in cls.attributes:
             symbol = visibility_to_symbol(attr.visibility)
             lines.append(f"  {symbol}{attr.name} : {attr.type}")
-
-        # Métodos
         for method in cls.methods:
             symbol = visibility_to_symbol(method.visibility)
             lines.append(f"  {symbol}{method.name} : {method.returnType}")
-
         lines.append("}")
         lines.append("")
 
-    # ── Generar relaciones ────────────────────────────────────────────────────
     for rel in uml_request.relationships:
         arrow = relationship_to_plantuml(rel.type)
-
-        # Con multiplicidad: Usuario "1" -- "*" Pedido
         if rel.multiplicityFrom or rel.multiplicityTo:
             mult_from = f'"{rel.multiplicityFrom}"' if rel.multiplicityFrom else ""
             mult_to   = f'"{rel.multiplicityTo}"'   if rel.multiplicityTo   else ""
@@ -113,8 +92,74 @@ def json_to_plantuml(uml_request) -> str:
 
     lines.append("")
     lines.append("@enduml")
-
     return "\n".join(lines)
+
+
+def json_to_plantuml_usecase(uml_request) -> str:
+    """
+    Genera código PlantUML para diagrama de casos de uso.
+    Las clases con name que empieza en mayúscula y sin atributos/métodos
+    se tratan como actores si están en relationships como origen,
+    y como casos de uso si están como destino.
+    """
+    lines = ["@startuml", "left to right direction", ""]
+
+    # Detectar actores y casos de uso desde las relaciones
+    actors = set()
+    usecases = set()
+
+    for rel in uml_request.relationships:
+        actors.add(rel.from_)
+        usecases.add(rel.to)
+
+    # Los que aparecen como destino Y origen son actores también
+    # Los que solo aparecen como destino son casos de uso
+    pure_usecases = usecases - actors
+
+    # Declarar actores
+    for cls in uml_request.classes:
+        if cls.name in actors:
+            lines.append(f'actor "{cls.name}" as {cls.name.replace(" ", "_")}')
+
+    lines.append("")
+    lines.append("rectangle Sistema {")
+
+    # Declarar casos de uso
+    for cls in uml_request.classes:
+        if cls.name in pure_usecases or cls.name in usecases:
+            safe_name = cls.name.replace(" ", "_")
+            lines.append(f'  usecase "{cls.name}" as {safe_name}')
+
+    lines.append("}")
+    lines.append("")
+
+    # Relaciones
+    for rel in uml_request.relationships:
+        from_safe = rel.from_.replace(" ", "_")
+        to_safe = rel.to.replace(" ", "_")
+        label = f" : {rel.label}" if rel.label else ""
+        lines.append(f"{from_safe} --> {to_safe}{label}")
+
+    lines.append("")
+    lines.append("@enduml")
+    return "\n".join(lines)
+
+
+def json_to_plantuml(uml_request) -> str:
+    """
+    Convierte un UMLRequest a código PlantUML.
+    Detecta el tipo de diagrama y llama a la función correspondiente.
+
+    Tipos soportados:
+    - class / classDiagram → diagrama de clases
+    - usecase / usecaseDiagram → diagrama de casos de uso
+    """
+    diagram_type = (uml_request.diagramType or "class").lower().strip()
+
+    if diagram_type in ("usecase", "usecasediagram", "use_case", "use-case"):
+        return json_to_plantuml_usecase(uml_request)
+
+    return json_to_plantuml_class(uml_request)
 
 
 async def generate_plantuml_image(plantuml_code: str, output_path: str) -> bool:
